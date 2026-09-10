@@ -1,0 +1,12 @@
+streamlit
+groq
+torch
+torchvision
+torchxrayvision
+grad-cam
+opencv-python-headless
+pillow
+numpy<2
+scikit-image
+python-dotenv
+pydantic
