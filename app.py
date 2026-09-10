@@ -1,13 +1,20 @@
 import streamlit as st
-from PIL import Image
 import os
-from vision import detect_abnormalities, generate_heatmap
-from agent import generate_clinical_report, generate_patient_summary, detect_urgency
+from vision import generate_heatmap, detect_abnormalities
+from orchestrator import run_agent
 from settings import SUPPORTED_LANGUAGES
 
 st.set_page_config(page_title="MedScribe AI", layout="wide")
 st.title("🩺 MedScribe AI")
-st.caption("Agentic radiology assistant — detects, explains, reports, translates.")
+st.caption("Agentic radiology assistant — reasons, reports, translates, escalates.")
+
+# RTL support for Urdu/Arabic
+st.markdown("""
+<style>
+    div[dir="rtl"] { font-family: 'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', sans-serif;
+                     font-size: 1.05rem; line-height: 2; }
+</style>
+""", unsafe_allow_html=True)
 
 col1, col2 = st.columns([1, 2])
 
@@ -22,14 +29,12 @@ if run and uploaded:
     with open(path, "wb") as f:
         f.write(uploaded.read())
 
-    with st.spinner("Detecting abnormalities..."):
-        findings, img_tensor = detect_abnormalities(path)
-        heatmap = generate_heatmap(path, img_tensor)
+    with st.spinner("🧠 Agent is reasoning..."):
+        result = run_agent(path, language)
 
-    with st.spinner("Writing report..."):
-        report = generate_clinical_report(findings)
-        urgency = detect_urgency(report)
-        summary = generate_patient_summary(report, language)
+    # Heatmap (still computed for visualization)
+    _, img_tensor = detect_abnormalities(path)
+    heatmap = generate_heatmap(path, img_tensor)
 
     with col2:
         st.subheader("📸 Scan + AI Attention")
@@ -37,18 +42,25 @@ if run and uploaded:
         c1.image(path, caption="Original", use_container_width=True)
         c2.image(heatmap, caption="AI Heatmap", use_container_width=True)
 
+    st.subheader("🧠 Agent Trace (what it decided to do)")
+    for step in result["agent_trace"]:
+        st.write(f"→ **{step['tool']}**  `{step['args']}`")
+
     st.subheader("📋 Clinical Report")
-    st.write(report)
+    st.write(result["clinical_report"])
 
-    st.subheader("🧠 Detected Findings")
-    for f in findings:
-        st.write(f"• **{f['label']}** — {f['confidence']*100:.1f}%")
-
-    badge = {"routine": "🟢 Routine", "urgent": "🟡 Urgent", "critical": "🔴 Critical"}
     st.subheader("🚨 Urgency")
-    st.markdown(f"### {badge[urgency]}")
-    if urgency == "critical":
-        st.error("⚠️ Critical finding — escalation alert sent.")
+    urgency = result["urgency"]
+    badge = {"routine": "🟢 Routine", "urgent": "🟡 Urgent", "critical": "🔴 Critical"}
+    st.markdown(f"### {badge.get(urgency, urgency)}")
+    if result["escalated"]:
+        st.error("⚠️ Critical finding — alert escalated to on-call radiologist.")
 
     st.subheader(f"💬 Patient Summary ({language})")
-    st.success(summary)
+    if language in ["Urdu", "Arabic", "Persian"]:
+        st.markdown(
+            f'<div dir="rtl" style="text-align:right;">{result["patient_summary"]}</div>',
+            unsafe_allow_html=True,
+        )
+    else:
+        st.success(result["patient_summary"])

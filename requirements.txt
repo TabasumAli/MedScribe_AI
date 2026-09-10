@@ -10,3 +10,6 @@ numpy<2
 scikit-image
 python-dotenv
 pydantic
+langgraph
+langchain-groq
+langchain-core
