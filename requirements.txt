@@ -13,3 +13,4 @@ pydantic
 langgraph
 langchain-groq
 langchain-core
+huggingface_hub

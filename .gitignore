@@ -24,6 +24,7 @@ ENV/
 .streamlit/secrets.toml
 
 # Model weights (large files)
+models/
 *.pt
 *.pth
 *.ckpt

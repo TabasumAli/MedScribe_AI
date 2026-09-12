@@ -31,15 +31,32 @@ CUSTOM_TRANSFORMS = transforms.Compose(
 
 #  MODEL LOADING
 
+# def _load_custom_model():
+#     """Load fine-tuned ResNet18 (2 classes: NORMAL, PNEUMONIA)."""
+#     model = models.resnet18(weights=None)
+#     model.fc = nn.Linear(model.fc.in_features, len(CUSTOM_CLASS_NAMES))
+#     state = torch.load(CUSTOM_MODEL_PATH, map_location="cpu")
+#     model.load_state_dict(state)
+#     model.eval()
+#     return model
+
+
 def _load_custom_model():
-    """Load fine-tuned ResNet18 (2 classes: NORMAL, PNEUMONIA)."""
+    """Load fine-tuned ResNet18 from Hugging Face Hub."""
+    from huggingface_hub import hf_hub_download
+    from settings import HF_MODEL_REPO, HF_MODEL_FILENAME
+    
+    model_path = hf_hub_download(
+        repo_id=HF_MODEL_REPO,
+        filename=HF_MODEL_FILENAME,
+    )
+    
     model = models.resnet18(weights=None)
     model.fc = nn.Linear(model.fc.in_features, len(CUSTOM_CLASS_NAMES))
-    state = torch.load(CUSTOM_MODEL_PATH, map_location="cpu")
+    state = torch.load(model_path, map_location="cpu")
     model.load_state_dict(state)
     model.eval()
     return model
-
 
 def _load_densenet_model():
     """Load pretrained DenseNet121 from TorchXRayVision (18 pathologies)."""
