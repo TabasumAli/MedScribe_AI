@@ -22,7 +22,7 @@ def get_secret(key):
 
 GROQ_API_KEY = get_secret("GROQ_API_KEY")
 LLM_MODEL = "openai/gpt-oss-120b"
-SUPPORTED_LANGUAGES = ["English", "Urdu", "Spanish", "Arabic", "Hindi"]
+SUPPORTED_LANGUAGES = ["English", "Urdu"]
 OUTPUT_DIR = "/tmp/outputs" if os.path.exists("/tmp") and os.access("/tmp", os.W_OK) else "outputs"
 
 # Hugging Face model repo — for downloading weights at runtime
