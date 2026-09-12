@@ -245,11 +245,6 @@
 #                "It is **not a medical device** and must not be used for real clinical diagnosis. "
 #                "Always consult a qualified radiologist.")
 
-
-
-
-
-
 from __future__ import annotations
 
 import html
@@ -2394,6 +2389,7 @@ def render_urgency(urgency: str, escalated: bool) -> None:
 
 
 def render_trace(trace: list[dict[str, Any]]) -> None:
+    """Render the agent workflow without Markdown interpreting indented HTML as code."""
     if not trace:
         st.markdown(
             '<div class="ms-empty-findings">No agent tool trace was returned for this run.</div>',
@@ -2401,27 +2397,32 @@ def render_trace(trace: list[dict[str, Any]]) -> None:
         )
         return
 
-    items = []
+    item_parts: list[str] = []
+
     for idx, step in enumerate(trace, start=1):
         tool_name = str(step.get("tool", "agent_step"))
         args = compact_args(step.get("args", {}))
-        items.append(
-            f"""
-            <div class="ms-trace-item">
-                <div class="ms-trace-no">{idx:02d}</div>
-                <div>
-                    <div class="ms-trace-tool">{esc(tool_name.replace('_', ' '))}</div>
-                    <div class="ms-trace-desc">{esc(trace_description(tool_name))}</div>
-                    <div class="ms-trace-args">{esc(args)}</div>
-                </div>
-            </div>
-            """
+
+        # Keep each HTML fragment on one continuous line. Streamlit Markdown can
+        # interpret 4-space-indented multiline HTML as a fenced/code block.
+        item_parts.append(
+            '<div class="ms-trace-item">'
+            f'<div class="ms-trace-no">{idx:02d}</div>'
+            '<div>'
+            f'<div class="ms-trace-tool">{esc(tool_name.replace("_", " "))}</div>'
+            f'<div class="ms-trace-desc">{esc(trace_description(tool_name))}</div>'
+            f'<div class="ms-trace-args">{esc(args)}</div>'
+            '</div>'
+            '</div>'
         )
 
-    st.markdown(
-        '<div class="ms-trace-shell">' + "".join(items) + "</div>",
-        unsafe_allow_html=True,
+    trace_html = (
+        '<div class="ms-trace-shell">'
+        + ''.join(item_parts)
+        + '</div>'
     )
+
+    st.markdown(trace_html, unsafe_allow_html=True)
 
 
 def export_text(
@@ -2765,3 +2766,6 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
+
+
+
