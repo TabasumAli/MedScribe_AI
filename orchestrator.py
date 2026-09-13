@@ -1,75 +1,141 @@
 # orchestrator.py
-from langgraph.prebuilt import create_react_agent
+"""
+MedScribe AI — Multi-Agent Supervisor
+
+The supervisor decides which specialist agents to invoke and in what order.
+Each specialist is a focused ReAct agent:
+
+  Detector Agent  → runs CV model
+  Reporter Agent  → writes clinical report + urgency
+  Translator Agent → writes patient summary in target language
+
+The supervisor may run them in sequence, skip some, or loop back if quality is low.
+"""
+
 from langchain_groq import ChatGroq
+from langgraph.prebuilt import create_react_agent
 from settings import GROQ_API_KEY, LLM_MODEL
-from tools import TOOLS
+from tools import escalate_to_doctor, verify_report_quality
+from specialist_agents import (
+    detector_agent,
+    reporter_agent,
+    translator_agent,
+    run_specialist,
+)
 
-
-# ═══════════════════════════════════════════════════════════════
-#  LLM — low temperature for consistent autonomous reasoning
-# ═══════════════════════════════════════════════════════════════
-llm = ChatGroq(
+# ─────────────────────────────────────────────────────────────
+#  Supervisor LLM
+# ─────────────────────────────────────────────────────────────
+_supervisor_llm = ChatGroq(
     api_key=GROQ_API_KEY,
     model=LLM_MODEL,
-    temperature=0.1,   # lowered from 0.2 for more consistent tool-calling
+    temperature=0.1,
 )
 
 
-# ═══════════════════════════════════════════════════════════════
-#  SYSTEM PROMPT — goal-only, no hardcoded workflow
-#  The LLM decides which tools to call and in what order.
-# ═══════════════════════════════════════════════════════════════
-SYSTEM_PROMPT = """You are MedScribe AI, an autonomous radiology agent.
+SUPERVISOR_PROMPT = """You are the MedScribe Supervisor Agent.
 
-YOUR GOAL: Analyze the chest X-ray at the given path and produce:
-1. A structured clinical report for the radiologist
-2. A plain-language patient summary in the patient's target language
-3. An escalation alert to the on-call doctor IF the findings are critical
+Your goal: produce a complete radiology analysis for the chest X-ray.
 
-YOU HAVE FULL AUTONOMY over which tools to call and in what order.
-Available tools:
-- detect_findings: runs the CV model on the image
-- write_clinical_report: generates the structured clinical report
-- assess_urgency: classifies urgency as routine / urgent / critical
-- write_patient_summary: creates a plain-language patient summary in the given language
-- escalate_to_doctor: sends an urgent alert — use ONLY if urgency is critical
+You coordinate 3 specialist agents and use 2 tools:
 
-Think step by step. Decide what to do next based on what you've learned 
-so far from previous tool calls. Explain your reasoning between tool calls.
-When the goal is complete, summarize what you did and why.
+SPECIALISTS (called via delegate_to_<name>):
+- detector: runs the CV model, returns findings with confidence scores
+- reporter: writes the clinical report + urgency assessment
+- translator: writes the plain-language patient summary in a target language
 
-Do not stop halfway. If a tool returns an error, adjust your approach.
+TOOLS:
+- escalate_to_doctor: sends an urgent alert to the on-call doctor
+- verify_report_quality: verifies the clinical report is complete
+
+YOUR WORKFLOW (you decide the order based on what you learn):
+
+1. Ask the detector to analyze the image
+2. Ask the reporter to write the clinical report using the findings
+3. Ask the translator to write the patient summary in the target language
+4. Call verify_report_quality to check the report
+5. If urgency is critical, call escalate_to_doctor
+6. When everything is done, summarize what you did
+
+Think step by step. If a specialist returns incomplete output, ask them to redo it.
 """
 
 
-# ═══════════════════════════════════════════════════════════════
-#  AGENT — LangGraph ReAct loop with the tools
-# ═══════════════════════════════════════════════════════════════
-agent = create_react_agent(
-    model=llm,
-    tools=TOOLS,
-    prompt=SYSTEM_PROMPT,
+# ─────────────────────────────────────────────────────────────
+#  Delegation tools — supervisor calls these to invoke specialists
+# ─────────────────────────────────────────────────────────────
+from langchain_core.tools import tool
+
+
+@tool
+def delegate_to_detector(image_path: str) -> str:
+    """Ask the Detector Agent to analyze the X-ray at image_path and return findings."""
+    result = run_specialist(detector_agent, f"Analyze this image: {image_path}")
+    return result["final"]
+
+
+@tool
+def delegate_to_reporter(findings: str) -> str:
+    """Ask the Reporter Agent to write a clinical report from the given findings."""
+    result = run_specialist(
+        reporter_agent, f"Write a clinical report for these findings:\n{findings}"
+    )
+    return result["final"]
+
+
+@tool
+def delegate_to_translator(report: str, language: str) -> str:
+    """Ask the Translator Agent to write a plain-language patient summary.
+
+    Args:
+        report: The clinical report text to translate.
+        language: The target language (e.g., English, Urdu, Spanish, Arabic, Hindi).
+    """
+    task = (
+        f"Write a plain-language patient summary in {language}.\n\n"
+        f"Clinical report:\n{report}"
+    )
+    result = run_specialist(translator_agent, task)
+    return result["final"]
+
+
+SUPERVISOR_TOOLS = [
+    delegate_to_detector,
+    delegate_to_reporter,
+    delegate_to_translator,
+    escalate_to_doctor,
+    verify_report_quality,
+]
+
+
+# ─────────────────────────────────────────────────────────────
+#  Supervisor agent
+# ─────────────────────────────────────────────────────────────
+supervisor_agent = create_react_agent(
+    model=_supervisor_llm,
+    tools=SUPERVISOR_TOOLS,
+    prompt=SUPERVISOR_PROMPT,
 )
 
 
-# ═══════════════════════════════════════════════════════════════
-#  RUNNER — invoke agent, collect outputs, return structured dict
-# ═══════════════════════════════════════════════════════════════
+# ─────────────────────────────────────────────────────────────
+#  Runner — same interface as before, no changes needed in app.py
+# ─────────────────────────────────────────────────────────────
 def run_agent(image_path: str, language: str) -> dict:
-    """Run the autonomous agent and return the collected outputs."""
+    """Run the multi-agent supervisor and return structured outputs."""
 
     user_message = (
         f"Analyze this chest X-ray: {image_path}\n"
         f"Patient language: {language}\n"
-        f"You decide the best approach."
+        f"Coordinate the specialists and produce the final outputs."
     )
 
-    result = agent.invoke(
+    result = supervisor_agent.invoke(
         {"messages": [{"role": "user", "content": user_message}]},
-        config={"recursion_limit": 30},   # allow more tool-call iterations
+        config={"recursion_limit": 40},  # higher for multi-agent coordination
     )
 
-    # ---------- Extract structured outputs from message history ----------
+    # ---------- Extract structured outputs ----------
     outputs = {
         "findings": None,
         "clinical_report": None,
@@ -81,50 +147,55 @@ def run_agent(image_path: str, language: str) -> dict:
     }
 
     for msg in result["messages"]:
-        # Capture tool calls and their arguments
+        # Capture tool calls
         if hasattr(msg, "tool_calls") and msg.tool_calls:
             for tc in msg.tool_calls:
-                outputs["agent_trace"].append({
-                    "tool": tc["name"],
-                    "args": tc["args"],
-                })
+                outputs["agent_trace"].append(
+                    {
+                        "tool": tc["name"],
+                        "args": tc["args"],
+                    }
+                )
 
         # Capture tool results
         if msg.__class__.__name__ == "ToolMessage":
             tool_name = getattr(msg, "name", "")
             content = msg.content
 
-            if tool_name == "detect_findings":
+            if tool_name == "delegate_to_detector":
                 outputs["findings"] = content
-            elif tool_name == "write_clinical_report":
+            elif tool_name == "delegate_to_reporter":
+                # Reporter returns both report and urgency — store the whole thing
                 outputs["clinical_report"] = content
-            elif tool_name == "assess_urgency":
-                outputs["urgency"] = content
-            elif tool_name == "write_patient_summary":
+            elif tool_name == "delegate_to_translator":
                 outputs["patient_summary"] = content
             elif tool_name == "escalate_to_doctor":
                 outputs["escalated"] = True
 
-    # Final message from the agent
+    # Extract urgency from the reporter's output (simple heuristic)
+    if outputs["clinical_report"]:
+        report_lower = str(outputs["clinical_report"]).lower()
+        if "critical" in report_lower:
+            outputs["urgency"] = "critical"
+        elif "urgent" in report_lower:
+            outputs["urgency"] = "urgent"
+        else:
+            outputs["urgency"] = "routine"
+
     outputs["final_message"] = result["messages"][-1].content
 
-    # ---------- Fallback: if agent forgot a step, fill critical gaps ----------
-    # (safety net — keeps the app functional even if the LLM skips a tool)
+    # ---------- Safety net ----------
     if outputs["clinical_report"] is None and outputs["findings"]:
-        # write_clinical_report was skipped — call it directly
         from tools import write_clinical_report
+
         outputs["clinical_report"] = write_clinical_report.invoke(
             {"findings": outputs["findings"]}
         )
-
-    if outputs["urgency"] is None and outputs["clinical_report"]:
-        from tools import assess_urgency
-        outputs["urgency"] = assess_urgency.invoke(
-            {"report": outputs["clinical_report"]}
-        )
-
+    if outputs["urgency"] is None:
+        outputs["urgency"] = "routine"
     if outputs["patient_summary"] is None and outputs["clinical_report"]:
         from tools import write_patient_summary
+
         outputs["patient_summary"] = write_patient_summary.invoke(
             {"report": outputs["clinical_report"], "language": language}
         )
