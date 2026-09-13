@@ -1,9 +1,8 @@
-# app.py — MedScribe AI (Tabbed Layout)
+# app.py — MedScribe AI (Navbar Layout)
 from __future__ import annotations
 
 import html
 import json
-import os
 import uuid
 from pathlib import Path
 from typing import Any
@@ -28,7 +27,7 @@ st.set_page_config(
 
 
 # ═══════════════════════════════════════════════════════════════
-#  ROYAL CSS
+#  ROYAL CSS + NAVBAR CSS
 # ═══════════════════════════════════════════════════════════════
 ROYAL_CSS = r"""
 <style>
@@ -66,13 +65,8 @@ html, body, [class*="css"] {
     overflow-x: hidden;
 }
 
-/* Hide Streamlit chrome */
-#MainMenu, footer, header[data-testid="stHeader"] {
-    visibility: hidden;
-}
-[data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"] {
-    display: none !important;
-}
+#MainMenu, footer, header[data-testid="stHeader"] { visibility: hidden; }
+[data-testid="stToolbar"], [data-testid="stDecoration"], [data-testid="stStatusWidget"] { display: none !important; }
 
 .block-container {
     max-width: 1480px;
@@ -80,76 +74,74 @@ html, body, [class*="css"] {
     padding-bottom: 3rem;
 }
 
-/* ── Top bar ────────────────────────────────────────────── */
-.ms-topbar {
+/* ── Navbar ──────────────────────────────────────────── */
+.ms-navbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 1rem;
-    padding: .75rem .2rem 1.15rem .2rem;
+    gap: 1.5rem;
+    padding: 1rem 0;
     border-bottom: 1px solid rgba(215,194,154,.12);
-    margin-bottom: 1.4rem;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
 }
-.ms-brand { display: flex; align-items: center; gap: .85rem; }
+.ms-nav-brand {
+    display: flex;
+    align-items: center;
+    gap: .85rem;
+    flex-shrink: 0;
+}
 .ms-monogram {
-    width: 2.55rem; height: 2.55rem;
+    width: 2.75rem; height: 2.75rem;
     display: grid; place-items: center;
     border: 1px solid rgba(215,194,154,.48);
     background: linear-gradient(145deg, rgba(215,194,154,.08), rgba(65,105,168,.045));
     color: var(--champagne);
     font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-    font-size: 1rem; letter-spacing: .08em;
+    font-size: 1.05rem; letter-spacing: .08em;
 }
 .ms-brand-name {
     font-family: "Iowan Old Style", "Palatino Linotype", Georgia, serif;
-    color: var(--ivory); font-size: 1.17rem; letter-spacing: .035em; line-height: 1.05;
+    color: var(--ivory); font-size: 1.2rem; letter-spacing: .035em; line-height: 1.05;
 }
 .ms-brand-meta {
     margin-top: .22rem; color: var(--muted-2);
     font-size: .62rem; letter-spacing: .18em; text-transform: uppercase;
 }
-.ms-system {
-    display: flex; align-items: center; gap: .58rem;
-    color: #aab6c5; font-size: .68rem; letter-spacing: .12em; text-transform: uppercase;
-}
-.ms-system-dot {
-    width: .48rem; height: .48rem; border-radius: 50%;
-    background: var(--success);
-    box-shadow: 0 0 0 0 rgba(88,168,137,.28);
-    animation: msPulse 2.4s ease-in-out infinite;
-}
-@keyframes msPulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(88,168,137,.28); }
-    50% { box-shadow: 0 0 0 7px rgba(88,168,137,0); }
-}
 
-/* ── Native Tabs restyle ────────────────────────────────── */
-[data-baseweb="tab-list"] {
-    gap: .35rem !important;
-    border-bottom: 1px solid rgba(151,169,191,.12) !important;
-    margin-bottom: 1.2rem;
-}
-button[data-baseweb="tab"] {
-    min-height: 2.9rem !important;
-    padding: 0 1.1rem !important;
-    border-radius: 0 !important;
+/* Nav link buttons — Streamlit ke buttons ko restyle karte hain */
+.ms-nav-links .stButton > button {
+    background: transparent !important;
+    border: 1px solid transparent !important;
     color: #7f8da0 !important;
-    font-size: .68rem !important;
+    min-height: 2.6rem !important;
+    padding: 0 .95rem !important;
+    font-size: .70rem !important;
     font-weight: 680 !important;
     letter-spacing: .10em !important;
-    text-transform: uppercase;
-    background: transparent !important;
+    text-transform: uppercase !important;
+    border-radius: 4px !important;
+    box-shadow: none !important;
+    transition: all .2s ease;
 }
-button[data-baseweb="tab"][aria-selected="true"] {
+.ms-nav-links .stButton > button:hover {
     color: var(--ivory) !important;
+    background: rgba(255,255,255,.03) !important;
+    border-color: rgba(215,194,154,.18) !important;
+    transform: none !important;
 }
-[data-baseweb="tab-highlight"] {
-    background: var(--champagne) !important;
-    height: 1px !important;
+.ms-nav-links .stButton > button[kind="primary"] {
+    background: rgba(215,194,154,.08) !important;
+    border: 1px solid rgba(215,194,154,.38) !important;
+    color: var(--champagne) !important;
+    box-shadow: none !important;
 }
-[data-baseweb="tab-border"] { background: transparent !important; }
+.ms-nav-links .stButton > button[kind="primary"]:hover {
+    background: rgba(215,194,154,.12) !important;
+    transform: none !important;
+}
 
-/* ── Section headings ──────────────────────────────────── */
+/* ── Section headings ──────────────────────────────── */
 .ms-eyebrow {
     color: var(--champagne);
     font-size: .68rem; font-weight: 650;
@@ -170,7 +162,7 @@ button[data-baseweb="tab"][aria-selected="true"] {
     margin-bottom: 1.4rem;
 }
 
-/* ── Panels ────────────────────────────────────────────── */
+/* ── Panels ─────────────────────────────────────────── */
 .ms-panel {
     border: 1px solid rgba(151,169,191,.14);
     background: linear-gradient(145deg, rgba(16,29,48,.66), rgba(10,21,36,.72));
@@ -193,7 +185,7 @@ button[data-baseweb="tab"][aria-selected="true"] {
     line-height: 1.65;
 }
 
-/* ── Urgency badge ─────────────────────────────────────── */
+/* ── Urgency badge ──────────────────────────────────── */
 .ms-badge {
     display: inline-block;
     padding: .5rem 1.1rem;
@@ -217,7 +209,7 @@ button[data-baseweb="tab"][aria-selected="true"] {
     line-height: 1.6;
 }
 
-/* ── Findings ──────────────────────────────────────────── */
+/* ── Findings ───────────────────────────────────────── */
 .ms-finding-row {
     padding: .8rem 0;
     border-bottom: 1px solid rgba(151,169,191,.08);
@@ -245,7 +237,7 @@ button[data-baseweb="tab"][aria-selected="true"] {
     transition: width .8s cubic-bezier(.2,.8,.2,1);
 }
 
-/* ── Trace items ───────────────────────────────────────── */
+/* ── Trace ──────────────────────────────────────────── */
 .ms-trace-item {
     display: grid;
     grid-template-columns: 2.4rem 1fr;
@@ -283,7 +275,7 @@ button[data-baseweb="tab"][aria-selected="true"] {
     font-size: .6rem; word-break: break-word;
 }
 
-/* ── Patient summary ───────────────────────────────────── */
+/* ── Patient summary ────────────────────────────────── */
 .ms-summary-text {
     color: #c8d0da;
     font-size: .9rem;
@@ -297,7 +289,7 @@ button[data-baseweb="tab"][aria-selected="true"] {
     text-align: right;
 }
 
-/* ── Metrics ───────────────────────────────────────────── */
+/* ── Metrics ────────────────────────────────────────── */
 .ms-metrics {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -321,7 +313,7 @@ button[data-baseweb="tab"][aria-selected="true"] {
     font-size: 1.7rem;
 }
 
-/* ── Buttons ───────────────────────────────────────────── */
+/* ── Buttons (Run analysis, download) ──────────────── */
 .stButton > button, .stDownloadButton > button {
     min-height: 3rem;
     border-radius: 4px !important;
@@ -342,7 +334,7 @@ button[data-baseweb="tab"][aria-selected="true"] {
     box-shadow: 0 16px 38px rgba(183,154,91,.28) !important;
 }
 
-/* ── File uploader ─────────────────────────────────────── */
+/* ── File uploader ─────────────────────────────────── */
 [data-testid="stFileUploader"] > label,
 [data-testid="stSelectbox"] > label {
     color: #a7b2c0 !important;
@@ -360,7 +352,6 @@ button[data-baseweb="tab"][aria-selected="true"] {
 [data-testid="stFileUploaderDropzone"]:hover {
     border-color: rgba(215,194,154,.45) !important;
 }
-
 div[data-baseweb="select"] > div {
     min-height: 3rem;
     background: linear-gradient(145deg, rgba(16,29,48,.72), rgba(11,23,40,.76)) !important;
@@ -371,7 +362,7 @@ div[data-baseweb="select"] > div {
 ul[role="listbox"] { background: #0d1928 !important; }
 li[role="option"] { color: #e6e1d8 !important; }
 
-/* ── Image frames ──────────────────────────────────────── */
+/* ── Image frames ───────────────────────────────────── */
 [data-testid="stImage"] {
     border: 1px solid rgba(151,169,191,.14);
     background: #04080d;
@@ -383,7 +374,7 @@ li[role="option"] { color: #e6e1d8 !important; }
     text-transform: uppercase;
 }
 
-/* ── Empty state ───────────────────────────────────────── */
+/* ── Empty state ────────────────────────────────────── */
 .ms-empty {
     text-align: center;
     padding: 4rem 2rem;
@@ -400,7 +391,7 @@ li[role="option"] { color: #e6e1d8 !important; }
 }
 .ms-empty-copy { font-size: .82rem; line-height: 1.65; }
 
-/* ── Footer ────────────────────────────────────────────── */
+/* ── Footer ─────────────────────────────────────────── */
 .ms-footer {
     margin-top: 3rem;
     padding-top: 1.15rem;
@@ -414,7 +405,6 @@ li[role="option"] { color: #e6e1d8 !important; }
 }
 .ms-footer strong { color: #8794a6; font-weight: 650; }
 
-/* ── Responsive ────────────────────────────────────────── */
 @media (max-width: 900px) {
     .block-container { padding-left: 1rem; padding-right: 1rem; }
     .ms-metrics { grid-template-columns: 1fr; }
@@ -474,27 +464,6 @@ def compact_args(args: Any, limit: int = 200) -> str:
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
-def render_topbar() -> None:
-    st.markdown(
-        """
-        <div class="ms-topbar">
-            <div class="ms-brand">
-                <div class="ms-monogram">MS</div>
-                <div>
-                    <div class="ms-brand-name">MedScribe AI</div>
-                    <div class="ms-brand-meta">Radiology Intelligence</div>
-                </div>
-            </div>
-            <div class="ms-system">
-                <span class="ms-system-dot"></span>
-                System operational
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
 def render_empty_state(icon: str, title: str, copy: str) -> None:
     st.markdown(
         f"""
@@ -518,6 +487,7 @@ DEFAULTS = {
     "scan_path": None,
     "scan_name": None,
     "language": "English",
+    "active_page": "Upload",
 }
 for k, v in DEFAULTS.items():
     if k not in st.session_state:
@@ -525,23 +495,57 @@ for k, v in DEFAULTS.items():
 
 
 # ═══════════════════════════════════════════════════════════════
-#  HEADER
+#  NAVBAR
 # ═══════════════════════════════════════════════════════════════
-render_topbar()
+NAV_ITEMS = [
+    ("Upload", "📤"),
+    ("Diagnosis", "🩺"),
+    ("Agent Trace", "🧠"),
+    ("Patient", "💬"),
+    ("Export", "📥"),
+]
+
+st.markdown('<div class="ms-navbar">', unsafe_allow_html=True)
+
+brand_col, links_col = st.columns([1, 2.6], gap="small")
+
+with brand_col:
+    st.markdown(
+        """
+        <div class="ms-nav-brand">
+            <div class="ms-monogram">MS</div>
+            <div>
+                <div class="ms-brand-name">MedScribe AI</div>
+                <div class="ms-brand-meta">Radiology Intelligence</div>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+with links_col:
+    st.markdown('<div class="ms-nav-links">', unsafe_allow_html=True)
+    nav_cols = st.columns(len(NAV_ITEMS))
+    for i, (page, icon) in enumerate(NAV_ITEMS):
+        with nav_cols[i]:
+            is_active = st.session_state.active_page == page
+            if st.button(
+                f"{icon} {page}",
+                key=f"nav_{page}",
+                type="primary" if is_active else "secondary",
+                use_container_width=True,
+            ):
+                st.session_state.active_page = page
+                st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ═══════════════════════════════════════════════════════════════
-#  TABS
+#  PAGE: UPLOAD
 # ═══════════════════════════════════════════════════════════════
-tab_upload, tab_diag, tab_trace, tab_patient, tab_export = st.tabs(
-    ["📤 Upload", "🩺 Diagnosis", "🧠 Agent Trace", "💬 Patient", "📥 Export"]
-)
-
-
-# ─────────────────────────────────────────────────────────────
-#  TAB 1 — UPLOAD
-# ─────────────────────────────────────────────────────────────
-with tab_upload:
+if st.session_state.active_page == "Upload":
     st.markdown('<div class="ms-eyebrow">Step 01 / New Analysis</div>', unsafe_allow_html=True)
     st.markdown('<div class="ms-h1">Radiograph intake</div>', unsafe_allow_html=True)
     st.markdown(
@@ -602,53 +606,50 @@ with tab_upload:
             except Exception:
                 st.image(uploaded, caption=uploaded.name, use_container_width=True)
 
+    if run and uploaded is not None:
+        outputs_dir = Path("outputs")
+        outputs_dir.mkdir(parents=True, exist_ok=True)
 
-# ─────────────────────────────────────────────────────────────
-#  RUN ANALYSIS (only once, outside tabs)
-# ─────────────────────────────────────────────────────────────
-if run and uploaded is not None:
-    outputs_dir = Path("outputs")
-    outputs_dir.mkdir(parents=True, exist_ok=True)
+        scan_name = Path(uploaded.name).name
+        scan_path = outputs_dir / f"scan_{uuid.uuid4().hex[:10]}{safe_suffix(scan_name)}"
+        scan_path.write_bytes(uploaded.getvalue())
 
-    scan_name = Path(uploaded.name).name
-    scan_path = outputs_dir / f"scan_{uuid.uuid4().hex[:10]}{safe_suffix(scan_name)}"
-    scan_path.write_bytes(uploaded.getvalue())
+        progress = st.progress(0, text="Preparing analysis workspace…")
 
-    progress = st.progress(0, text="Preparing analysis workspace…")
+        try:
+            progress.progress(15, text="Radiograph secured. Starting agentic analysis…")
+            result = run_agent(str(scan_path), st.session_state.language)
 
-    try:
-        progress.progress(15, text="Radiograph secured. Starting agentic analysis…")
-        result = run_agent(str(scan_path), st.session_state.language)
+            progress.progress(75, text="Agent workflow complete. Generating explainability map…")
+            findings, img_tensor = detect_abnormalities(str(scan_path))
+            heatmap = generate_heatmap(str(scan_path), img_tensor)
 
-        progress.progress(75, text="Agent workflow complete. Generating explainability map…")
-        findings, img_tensor = detect_abnormalities(str(scan_path))
-        heatmap = generate_heatmap(str(scan_path), img_tensor)
+            progress.progress(100, text="Analysis complete.")
 
-        progress.progress(100, text="Analysis complete.")
+            st.session_state.result = result
+            st.session_state.findings = findings
+            st.session_state.heatmap = heatmap
+            st.session_state.scan_path = str(scan_path)
+            st.session_state.scan_name = scan_name
 
-        st.session_state.result = result
-        st.session_state.findings = findings
-        st.session_state.heatmap = heatmap
-        st.session_state.scan_path = str(scan_path)
-        st.session_state.scan_name = scan_name
+            st.session_state.active_page = "Diagnosis"
+            st.rerun()
 
-        st.success("✅ Analysis completed. Check the other tabs.")
-
-    except Exception as exc:
-        progress.empty()
-        print(f"[MedScribe AI] Analysis error: {type(exc).__name__}: {exc}")
-        st.error("The analysis could not be completed. Please verify the study and try again.")
+        except Exception as exc:
+            progress.empty()
+            print(f"[MedScribe AI] Analysis error: {type(exc).__name__}: {exc}")
+            st.error("The analysis could not be completed. Please verify the study and try again.")
 
 
-# ─────────────────────────────────────────────────────────────
-#  TAB 2 — DIAGNOSIS
-# ─────────────────────────────────────────────────────────────
-with tab_diag:
+# ═══════════════════════════════════════════════════════════════
+#  PAGE: DIAGNOSIS
+# ═══════════════════════════════════════════════════════════════
+elif st.session_state.active_page == "Diagnosis":
     if st.session_state.result is None:
         render_empty_state(
             "🩺",
             "No analysis yet",
-            "Run an analysis from the Upload tab to see the diagnosis here.",
+            "Run an analysis from the Upload page to see the diagnosis here.",
         )
     else:
         result = st.session_state.result
@@ -666,7 +667,6 @@ with tab_diag:
             unsafe_allow_html=True,
         )
 
-        # Metrics
         st.markdown(
             f"""
             <div class="ms-metrics">
@@ -687,14 +687,12 @@ with tab_diag:
             unsafe_allow_html=True,
         )
 
-        # Images
         img1, img2 = st.columns(2, gap="medium")
         with img1:
             st.image(scan_path, caption="Original radiograph", use_container_width=True)
         with img2:
             st.image(heatmap, caption="Grad-CAM attention map", use_container_width=True)
 
-        # Urgency + Findings
         st.markdown('<div class="ms-eyebrow" style="margin-top:1.5rem;">Triage</div>', unsafe_allow_html=True)
         badge_map = {
             "routine": ("ms-badge-routine", "🟢 Routine"),
@@ -712,7 +710,6 @@ with tab_diag:
                 unsafe_allow_html=True,
             )
 
-        # Findings bars
         st.markdown('<div class="ms-eyebrow" style="margin-top:1.5rem;">Detected findings</div>', unsafe_allow_html=True)
         if not findings:
             st.markdown(
@@ -741,7 +738,6 @@ with tab_diag:
                 )
             st.markdown(f'<div class="ms-panel">{"".join(rows)}</div>', unsafe_allow_html=True)
 
-        # Clinical report
         st.markdown('<div class="ms-eyebrow" style="margin-top:1.5rem;">Clinical report</div>', unsafe_allow_html=True)
         st.markdown(
             f'<div class="ms-panel gold-edge">{result.get("clinical_report") or "No report returned."}</div>',
@@ -749,10 +745,10 @@ with tab_diag:
         )
 
 
-# ─────────────────────────────────────────────────────────────
-#  TAB 3 — AGENT TRACE
-# ─────────────────────────────────────────────────────────────
-with tab_trace:
+# ═══════════════════════════════════════════════════════════════
+#  PAGE: AGENT TRACE
+# ═══════════════════════════════════════════════════════════════
+elif st.session_state.active_page == "Agent Trace":
     if st.session_state.result is None:
         render_empty_state(
             "🧠",
@@ -793,10 +789,10 @@ with tab_trace:
             st.write(result.get("final_message", "—"))
 
 
-# ─────────────────────────────────────────────────────────────
-#  TAB 4 — PATIENT VIEW
-# ─────────────────────────────────────────────────────────────
-with tab_patient:
+# ═══════════════════════════════════════════════════════════════
+#  PAGE: PATIENT
+# ═══════════════════════════════════════════════════════════════
+elif st.session_state.active_page == "Patient":
     if st.session_state.result is None:
         render_empty_state(
             "💬",
@@ -809,10 +805,7 @@ with tab_patient:
         summary = result.get("patient_summary") or "No patient summary returned."
 
         st.markdown('<div class="ms-eyebrow">Step 04 / Patient Communication</div>', unsafe_allow_html=True)
-        st.markdown(
-            f'<div class="ms-h1">{esc(language)}</div>',
-            unsafe_allow_html=True,
-        )
+        st.markdown(f'<div class="ms-h1">{esc(language)}</div>', unsafe_allow_html=True)
         st.markdown(
             '<div class="ms-sub">A plain-language summary of the scan, written for the patient.</div>',
             unsafe_allow_html=True,
@@ -826,10 +819,10 @@ with tab_patient:
         )
 
 
-# ─────────────────────────────────────────────────────────────
-#  TAB 5 — EXPORT
-# ─────────────────────────────────────────────────────────────
-with tab_export:
+# ═══════════════════════════════════════════════════════════════
+#  PAGE: EXPORT
+# ═══════════════════════════════════════════════════════════════
+elif st.session_state.active_page == "Export":
     if st.session_state.result is None:
         render_empty_state(
             "📥",
